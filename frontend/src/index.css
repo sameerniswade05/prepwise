@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+body {
+  font-family: sans-serif;
+  height: 100vh;
+  color: azure;
+}
+
+.dark {
+  background-color: black;
+}
