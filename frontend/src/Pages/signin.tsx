@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { loginAPI } from "@/services/api";
 
@@ -29,14 +29,13 @@ function Signin() {
     setIsLoading(true);
 
     try {
-      // Call backend login API
       const response = await loginAPI(formData.email, formData.password);
 
-      // Save user and token to context
       if (auth) {
         auth.login({
           user: response.user,
-          token: response.token,
+          accessToken: response.accessToken,
+          refreshToken: response.refreshToken,
         });
       }
 
@@ -51,10 +50,11 @@ function Signin() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-linear-to-br from-slate-950 via-slate-900 to-slate-800 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">Practice job interviews with AI</h1>
+          <p className="text-slate-400 text-sm">Sign in to your account to continue</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -94,11 +94,22 @@ function Signin() {
           <Button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold h-12 rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-linear-to-r from-indigo-500 to-purple-500 text-white font-semibold h-12 rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? "Signing in..." : "Sign in"}
           </Button>
         </form>
+
+        {/* Sign up link */}
+        <p className="mt-6 text-center text-slate-400 text-sm">
+          Don't have an account?{" "}
+          <Link
+            to="/signup"
+            className="text-violet-400 hover:text-violet-300 font-medium transition-colors"
+          >
+            Create one for free
+          </Link>
+        </p>
       </div>
     </div>
   );

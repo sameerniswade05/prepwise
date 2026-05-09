@@ -6,6 +6,7 @@ import {
   getInterviewById,
   saveTranscriptAndFeedback,
   getSystemPrompt,
+  getResumeSystemPrompt,
 } from "../controller/interview/interview.controller.js";
 
 const router = express.Router();
@@ -15,6 +16,7 @@ router.use(authMiddleware);
 router.post("/", createInterview);
 router.get("/", getUserInterviews);
 router.get("/system-prompt", getSystemPrompt);
+router.post("/resume-prompt", getResumeSystemPrompt);
 router.get("/:id", getInterviewById);
 router.post("/:id/feedback", saveTranscriptAndFeedback);
 

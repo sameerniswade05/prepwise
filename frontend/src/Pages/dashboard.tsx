@@ -6,6 +6,19 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import {
+  Code2,
+  Cloud,
+  Users,
+  Layers,
+  BarChart2,
+  Smartphone,
+  Database,
+  Shield,
+  TrendingUp,
+  FileText,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import {
   getProfileAPI,
   updateProfileAPI,
   getUserInterviewsAPI,
@@ -53,17 +66,28 @@ type PastInterview = {
   feedback: { overallScore: number; verdict: string };
 };
 
-const pickInterviews = [
-  { title: "Full-Stack Dev Interview", type: "Technical", role: "Full-Stack Developer", techStack: "React, Node.js" },
-  { title: "DevOps & Cloud Interview", type: "Technical", role: "DevOps Engineer", techStack: "AWS, Docker, Kubernetes" },
-  { title: "HR Screening Interview", type: "Non-Technical", role: "HR Screening", techStack: "" },
-  { title: "System Design Interview", type: "Technical", role: "Software Architect", techStack: "System Design" },
-  { title: "Business Analyst Interview", type: "Non-Technical", role: "Business Analyst", techStack: "" },
-  { title: "Mobile App Dev Interview", type: "Technical", role: "Mobile Developer", techStack: "React Native, iOS, Android" },
-  { title: "Database & SQL Interview", type: "Technical", role: "Database Engineer", techStack: "SQL, PostgreSQL, MongoDB" },
-  { title: "Cybersecurity Interview", type: "Technical", role: "Security Engineer", techStack: "Cybersecurity" },
-  { title: "Sales & Marketing Interview", type: "Non-Technical", role: "Sales & Marketing", techStack: "" },
+type PickInterview = {
+  title: string;
+  type: string;
+  role: string;
+  techStack: string;
+  Icon: LucideIcon;
+};
+
+const pickInterviews: PickInterview[] = [
+  { title: "Full-Stack Dev Interview", type: "Technical", role: "Full-Stack Developer", techStack: "React, Node.js", Icon: Code2 },
+  { title: "DevOps & Cloud Interview", type: "Technical", role: "DevOps Engineer", techStack: "AWS, Docker, Kubernetes", Icon: Cloud },
+  { title: "HR Screening Interview", type: "Non-Technical", role: "HR Screening", techStack: "", Icon: Users },
+  { title: "System Design Interview", type: "Technical", role: "Software Architect", techStack: "System Design", Icon: Layers },
+  { title: "Business Analyst Interview", type: "Non-Technical", role: "Business Analyst", techStack: "", Icon: BarChart2 },
+  { title: "Mobile App Dev Interview", type: "Technical", role: "Mobile Developer", techStack: "React Native, iOS, Android", Icon: Smartphone },
+  { title: "Database & SQL Interview", type: "Technical", role: "Database Engineer", techStack: "SQL, PostgreSQL, MongoDB", Icon: Database },
+  { title: "Cybersecurity Interview", type: "Technical", role: "Security Engineer", techStack: "Cybersecurity", Icon: Shield },
+  { title: "Sales & Marketing Interview", type: "Non-Technical", role: "Sales & Marketing", techStack: "", Icon: TrendingUp },
 ];
+
+const DURATION_OPTIONS = [10, 20, 30];
+const priceForDuration = (minutes: number) => minutes; // ₹10 per 10 min
 
 function loadRazorpayScript(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -89,14 +113,25 @@ function Dashboard() {
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isPaymentPending, setIsPaymentPending] = useState(false);
   const [pendingInterviewConfig, setPendingInterviewConfig] = useState<{
-    title: string; type: string; role: string; techStack: string; duration: string;
+    title: string; type: string; role: string; techStack: string; duration: string; resumeContext?: string;
   } | null>(null);
+
+  // Resume interview modal
+  const [isResumeInterviewOpen, setIsResumeInterviewOpen] = useState(false);
+  const [resumeInterviewDuration, setResumeInterviewDuration] = useState(10);
+  const [resumeContext, setResumeContext] = useState(""); // user-pasted resume text
+  const [resumeUploadFile, setResumeUploadFile] = useState<File | null>(null);
+  const [resumeUploadLoading, setResumeUploadLoading] = useState(false);
+
+  // Per-card selected duration (minutes), default 10
+  const [pickDurations, setPickDurations] = useState<Record<string, number>>({});
+  const getPickDuration = (title: string) => pickDurations[title] ?? 10;
 
   const [interviewForm, setInterviewForm] = useState({
     interviewType: "Technical",
     role: "",
     techStack: "",
-    duration: "10 minutes",
+    duration: "10",
   });
 
   const [accountForm, setAccountForm] = useState({
@@ -105,6 +140,13 @@ function Dashboard() {
   });
   const [accountPhoto, setAccountPhoto] = useState<File | null>(null);
   const [accountResume, setAccountResume] = useState<File | null>(null);
+
+  // Prevent body scroll when any modal is open
+  useEffect(() => {
+    const anyOpen = isInterviewOpen || isAccountOpen || isResumeInterviewOpen;
+    document.body.style.overflow = anyOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [isInterviewOpen, isAccountOpen, isResumeInterviewOpen]);
 
   useEffect(() => {
     if (auth?.user) {
@@ -135,13 +177,13 @@ function Dashboard() {
     setInterviewForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Payment → then open interview confirmation
   const initiatePaymentAndInterview = async (config: typeof pendingInterviewConfig) => {
     if (!auth?.token || !config) return;
 
+    const durationMinutes = parseInt(config.duration) || 10;
+    const price = priceForDuration(durationMinutes);
     const razorpayKeyId = import.meta.env.VITE_RAZORPAY_KEY_ID;
 
-    // If no Razorpay keys configured, skip payment for dev
     if (!razorpayKeyId) {
       toast.info("Razorpay not configured — skipping payment in dev mode.");
       await createAndNavigate(config, "dev_payment_skipped", "dev_order_skipped");
@@ -154,7 +196,7 @@ function Dashboard() {
       const loaded = await loadRazorpayScript();
       if (!loaded) throw new Error("Failed to load Razorpay");
 
-      const order = await createPaymentOrderAPI(auth.token);
+      const order = await createPaymentOrderAPI(auth.token, durationMinutes);
 
       await new Promise<void>((resolve, reject) => {
         const rzp = new window.Razorpay({
@@ -162,7 +204,7 @@ function Dashboard() {
           amount: order.amount,
           currency: order.currency,
           name: "PrepWise",
-          description: "Interview Session — ₹10",
+          description: `Interview Session — ₹${price} (${durationMinutes} min)`,
           order_id: order.orderId,
           handler: async (response) => {
             try {
@@ -213,7 +255,11 @@ function Dashboard() {
       },
       auth.token
     );
-    navigate(`/interview/${result.interview.id}`);
+    // Pass resumeContext in navigate state for Resume interviews
+    const navState = config.type === "Resume" && config.resumeContext
+      ? { resumeContext: config.resumeContext }
+      : undefined;
+    navigate(`/interview/${result.interview.id}`, { state: navState });
   };
 
   const handleStartInterview = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -235,13 +281,14 @@ function Dashboard() {
     setPendingInterviewConfig(null);
   };
 
-  const handlePickInterview = async (pick: (typeof pickInterviews)[0]) => {
+  const handlePickInterview = async (pick: PickInterview) => {
+    const duration = getPickDuration(pick.title);
     const config = {
       title: pick.title,
       type: pick.type,
       role: pick.role,
       techStack: pick.techStack,
-      duration: "10 minutes",
+      duration: String(duration),
     };
     setPendingInterviewConfig(config);
     await initiatePaymentAndInterview(config);
@@ -269,6 +316,47 @@ function Dashboard() {
     }
   };
 
+  const handleResumeInterview = () => {
+    // Always open the modal — it shows the upload form if no resume exists
+    setIsResumeInterviewOpen(true);
+  };
+
+  const handleUploadResumeFromModal = async () => {
+    if (!resumeUploadFile || !auth?.token) return;
+    setResumeUploadLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("fullName", auth.user?.fullName || "");
+      formData.append("email", auth.user?.email || "");
+      formData.append("resume", resumeUploadFile);
+      const result = await updateProfileAPI(formData, auth.token);
+      auth.updateUser(result.user);
+      setResumeUploadFile(null);
+      toast.success("Resume uploaded! You can now start your interview.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setResumeUploadLoading(false);
+    }
+  };
+
+  const handleStartResumeInterview = async () => {
+    const config = {
+      title: "Resume-Based Interview",
+      type: "Resume",
+      role: "Resume Review",
+      techStack: "",
+      duration: String(resumeInterviewDuration),
+      resumeContext: resumeContext.trim(),
+    };
+    setIsResumeInterviewOpen(false);
+    setResumeContext("");
+    setResumeUploadFile(null);
+    setPendingInterviewConfig(config);
+    await initiatePaymentAndInterview(config);
+    setPendingInterviewConfig(null);
+  };
+
   const handleLogout = () => {
     auth?.logout();
     toast.success("Logged out successfully.");
@@ -277,6 +365,10 @@ function Dashboard() {
 
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+  // Price shown in the modal based on currently selected duration
+  const modalDuration = parseInt(interviewForm.duration) || 10;
+  const modalPrice = priceForDuration(modalDuration);
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
@@ -289,7 +381,7 @@ function Dashboard() {
               Get Interview-Ready with AI-Powered Practice & Feedback
             </h1>
             <p className="max-w-xl text-slate-400">
-              Practice real interview questions and get instant feedback. Each session costs ₹10.
+              Practice real interview questions and get instant feedback. ₹10 per 10-minute session.
             </p>
             <div className="flex flex-wrap gap-4">
               <Button
@@ -298,6 +390,15 @@ function Dashboard() {
                 onClick={() => setIsInterviewOpen(true)}
               >
                 {isPaymentPending ? "Processing..." : "Start an Interview"}
+              </Button>
+              <Button
+                className="min-w-42.5 bg-indigo-600 text-white hover:bg-indigo-500 flex items-center gap-2"
+                disabled={isPaymentPending}
+                onClick={handleResumeInterview}
+                title={!auth?.user?.resumePath ? "Upload your resume in Account Details first" : undefined}
+              >
+                <FileText className="h-4 w-4" />
+                {isPaymentPending ? "Processing..." : "Interview from Resume"}
               </Button>
               <Button
                 variant="outline"
@@ -383,39 +484,195 @@ function Dashboard() {
           {/* Pick interview */}
           <div>
             <h2 className="text-2xl font-semibold">Pick Your Interview</h2>
-            <p className="text-sm text-slate-400 mt-1">Choose a domain and get started in seconds. ₹10 per session.</p>
+            <p className="text-sm text-slate-400 mt-1">
+              Choose a domain, select duration, and get started in seconds. ₹10 per 10 minutes.
+            </p>
             <div className="mt-6 grid gap-4 lg:grid-cols-3">
-              {pickInterviews.map((item) => (
-                <div
-                  key={item.title}
-                  className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-xl"
-                >
-                  <div className="mb-4 flex items-center justify-between">
-                    <div className="h-11 w-11 rounded-2xl bg-slate-800" />
-                    <span className="rounded-2xl bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-300">
-                      {item.type}
-                    </span>
+              {pickInterviews.map((item) => {
+                const selectedDuration = getPickDuration(item.title);
+                const price = priceForDuration(selectedDuration);
+                return (
+                  <div
+                    key={item.title}
+                    className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 shadow-xl flex flex-col"
+                  >
+                    {/* Header: icon + type badge */}
+                    <div className="mb-4 flex items-center justify-between">
+                      <div className="h-11 w-11 rounded-2xl bg-slate-800 flex items-center justify-center">
+                        <item.Icon className="h-5 w-5 text-violet-400" />
+                      </div>
+                      <span className="rounded-2xl bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-300">
+                        {item.type}
+                      </span>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold">{item.title}</h3>
+                      <p className="mt-2 text-sm text-slate-400">{item.role}</p>
+                      {item.techStack && (
+                        <p className="mt-1 text-xs text-slate-500">{item.techStack}</p>
+                      )}
+                    </div>
+
+                    {/* Duration selector */}
+                    <div className="mt-4 flex gap-2">
+                      {DURATION_OPTIONS.map((min) => (
+                        <button
+                          key={min}
+                          type="button"
+                          onClick={() =>
+                            setPickDurations((prev) => ({ ...prev, [item.title]: min }))
+                          }
+                          className={`flex-1 rounded-full py-1.5 text-xs font-medium transition ${
+                            selectedDuration === min
+                              ? "bg-violet-500 text-white"
+                              : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                          }`}
+                        >
+                          {min}m
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* CTA button — always at bottom, same position on every card */}
+                    <div className="mt-4">
+                      <Button
+                        className="w-full bg-violet-500 text-white hover:bg-violet-400"
+                        disabled={isPaymentPending}
+                        onClick={() => handlePickInterview(item)}
+                      >
+                        Take interview — ₹{price}
+                      </Button>
+                    </div>
                   </div>
-                  <h3 className="text-lg font-semibold">{item.title}</h3>
-                  <p className="mt-2 text-sm text-slate-400">{item.role}</p>
-                  {item.techStack && (
-                    <p className="mt-1 text-xs text-slate-500">{item.techStack}</p>
-                  )}
-                  <div className="mt-5">
-                    <Button
-                      className="w-full bg-violet-500 text-white hover:bg-violet-400"
-                      disabled={isPaymentPending}
-                      onClick={() => handlePickInterview(item)}
-                    >
-                      Take interview — ₹10
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>
       </div>
+
+      {/* ── Resume Interview Modal ── */}
+      {isResumeInterviewOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
+          <div className="relative w-full max-w-md rounded-4xl border border-slate-800 bg-slate-900 p-8 shadow-2xl">
+            {/* Close */}
+            <button
+              className="absolute right-5 top-5 rounded-full border border-slate-700 bg-slate-900 p-2 text-slate-300 hover:bg-slate-800"
+              onClick={() => { setIsResumeInterviewOpen(false); setResumeContext(""); setResumeUploadFile(null); }}
+            >
+              ✕
+            </button>
+
+            {/* Header */}
+            <div className="mb-6 space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-600/20">
+                  <FileText className="h-5 w-5 text-indigo-400" />
+                </div>
+                <p className="text-sm uppercase tracking-[0.3em] text-slate-400">Resume Interview</p>
+              </div>
+              <h2 className="text-2xl font-semibold">Interview from Your Resume</h2>
+            </div>
+
+            {/* ── NO RESUME: upload prompt ── */}
+            {!auth?.user?.resumePath ? (
+              <div className="space-y-5">
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-4">
+                  <p className="text-sm font-medium text-amber-400">No resume uploaded yet</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Upload your resume PDF below to enable personalized AI interview questions based on your real experience.
+                  </p>
+                </div>
+
+                <div>
+                  <Label className="text-sm text-slate-300 mb-2 block">Upload your resume (PDF)</Label>
+                  <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-slate-600 bg-slate-800/50 px-4 py-4 hover:border-indigo-500 transition">
+                    <FileText className="h-5 w-5 text-slate-400 shrink-0" />
+                    <span className="text-sm text-slate-400 truncate">
+                      {resumeUploadFile ? resumeUploadFile.name : "Click to select a PDF file"}
+                    </span>
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      className="hidden"
+                      onChange={(e) => setResumeUploadFile(e.target.files?.[0] || null)}
+                    />
+                  </label>
+                </div>
+
+                <Button
+                  className="w-full bg-indigo-600 text-white hover:bg-indigo-500 h-12"
+                  disabled={!resumeUploadFile || resumeUploadLoading}
+                  onClick={handleUploadResumeFromModal}
+                >
+                  {resumeUploadLoading ? "Uploading..." : "Upload Resume"}
+                </Button>
+              </div>
+            ) : (
+              /* ── HAS RESUME: duration + optional text + start ── */
+              <div className="space-y-5">
+                <p className="text-slate-400 text-sm">
+                  The AI interviewer will ask personalized questions based on your resume. If your PDF is image-based, paste your resume text below for best results.
+                </p>
+
+                {/* Duration */}
+                <div>
+                  <Label className="text-sm text-slate-300 mb-3 block">Select duration</Label>
+                  <div className="flex gap-3">
+                    {DURATION_OPTIONS.map((min) => (
+                      <button
+                        key={min}
+                        type="button"
+                        onClick={() => setResumeInterviewDuration(min)}
+                        className={`flex-1 rounded-2xl py-3 text-sm font-medium transition ${
+                          resumeInterviewDuration === min
+                            ? "bg-indigo-600 text-white"
+                            : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                        }`}
+                      >
+                        {min} min
+                        <span className="block text-xs mt-0.5 opacity-70">₹{priceForDuration(min)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Optional resume text paste */}
+                <div>
+                  <Label className="text-sm text-slate-300 mb-1 block">
+                    Paste resume text{" "}
+                    <span className="text-slate-500 font-normal">(optional — helps if your PDF is image-based)</span>
+                  </Label>
+                  <textarea
+                    value={resumeContext}
+                    onChange={(e) => setResumeContext(e.target.value)}
+                    placeholder="Paste the text content of your resume here so the AI can ask targeted questions…"
+                    rows={4}
+                    className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none focus:border-indigo-500 resize-none"
+                  />
+                </div>
+
+                {/* Pricing note */}
+                <div className="rounded-2xl border border-slate-700 bg-slate-950/50 px-4 py-3 text-sm text-slate-400">
+                  Payment of{" "}
+                  <span className="text-indigo-400 font-semibold">₹{priceForDuration(resumeInterviewDuration)}</span>{" "}
+                  will be charged for a {resumeInterviewDuration}-minute session.
+                </div>
+
+                <Button
+                  className="w-full bg-indigo-600 text-white hover:bg-indigo-500 h-12"
+                  disabled={isPaymentPending}
+                  onClick={handleStartResumeInterview}
+                >
+                  Pay ₹{priceForDuration(resumeInterviewDuration)} & Start Resume Interview
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Interview Config Modal ── */}
       {isInterviewOpen && (
@@ -430,7 +687,10 @@ function Dashboard() {
             <div className="mb-8 space-y-2">
               <p className="text-sm uppercase tracking-[0.3em] text-slate-400">Interview Confirmation</p>
               <h2 className="text-3xl font-semibold">Starting Your Interview</h2>
-              <p className="text-slate-400">Customize your mock interview. Payment of ₹10 will be charged.</p>
+              <p className="text-slate-400">
+                Customize your mock interview. Payment of{" "}
+                <span className="text-violet-400 font-semibold">₹{modalPrice}</span> will be charged.
+              </p>
             </div>
 
             <form className="grid gap-5" onSubmit={handleStartInterview}>
@@ -474,13 +734,13 @@ function Dashboard() {
                   onChange={handleInterviewChange}
                   className="mt-2 w-full rounded-3xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-violet-500"
                 >
-                  <option>10 minutes</option>
-                  <option>20 minutes</option>
-                  <option>30 minutes</option>
+                  <option value="10">10 minutes — ₹10</option>
+                  <option value="20">20 minutes — ₹20</option>
+                  <option value="30">30 minutes — ₹30</option>
                 </select>
               </div>
               <Button type="submit" className="w-full bg-violet-500 text-white hover:bg-violet-400">
-                Pay ₹10 & Start Interview
+                Pay ₹{modalPrice} & Start Interview
               </Button>
             </form>
           </div>
@@ -532,7 +792,6 @@ function Dashboard() {
                 {accountPhoto && <p className="mt-1 text-xs text-slate-400">Selected: {accountPhoto.name}</p>}
               </div>
 
-              {/* Resume section */}
               <div>
                 <Label className="text-sm text-slate-300">Resume (PDF)</Label>
                 {auth?.user?.resumePath && !accountResume && (

@@ -4,6 +4,7 @@ import {
   getInterviewByIdService,
   saveTranscriptAndFeedbackService,
   buildSystemPromptService,
+  buildResumeInterviewPromptService,
 } from "../../services/interview.service.js";
 
 export const createInterview = async (req, res) => {
@@ -87,5 +88,17 @@ export const getSystemPrompt = async (req, res) => {
     res.status(200).json(result);
   } catch (error) {
     res.status(500).json({ message: error.message || "Failed to build prompt" });
+  }
+};
+
+export const getResumeSystemPrompt = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const { duration, resumeContext } = req.body;
+
+    const result = await buildResumeInterviewPromptService({ userId, duration, resumeContext });
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(400).json({ message: error.message || "Failed to build resume prompt" });
   }
 };

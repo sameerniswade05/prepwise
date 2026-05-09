@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import VapiSDK from "@vapi-ai/web";
 // CJS/ESM interop: @vapi-ai/web uses exports.default, Vite may wrap it
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Vapi = ((VapiSDK as any).default ?? VapiSDK) as typeof VapiSDK;
 import { toast } from "sonner";
+import { FileText } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { getInterviewByIdAPI, saveTranscriptAPI, getSystemPromptAPI } from "@/services/api";
+import { getInterviewByIdAPI, saveTranscriptAPI, getSystemPromptAPI, getResumeSystemPromptAPI } from "@/services/api";
 import { Button } from "@/components/ui/button";
 
 type TranscriptEntry = { role: "assistant" | "user"; content: string };
@@ -25,6 +26,8 @@ export default function Interview() {
   const { id } = useParams<{ id: string }>();
   const auth = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const resumeContext = (location.state as { resumeContext?: string } | null)?.resumeContext;
 
   const [interview, setInterview] = useState<Interview | null>(null);
   const [isCallActive, setIsCallActive] = useState(false);
@@ -122,15 +125,22 @@ export default function Interview() {
     setIsConnecting(true);
 
     try {
-      const { systemPrompt } = await getSystemPromptAPI(
-        {
-          type: interview.type,
-          role: interview.role,
-          techStack: interview.techStack,
-          duration: interview.duration,
-        },
-        auth.token
-      );
+      const isResume = interview.type === "Resume";
+      const { systemPrompt } = isResume
+        ? await getResumeSystemPromptAPI(interview.duration, auth.token, resumeContext)
+        : await getSystemPromptAPI(
+            {
+              type: interview.type,
+              role: interview.role,
+              techStack: interview.techStack,
+              duration: interview.duration,
+            },
+            auth.token
+          );
+
+      const firstMessage = isResume
+        ? "Hello! I've reviewed your resume and I'm ready to ask you some personalised questions based on your experience. Let's get started!"
+        : "Hello! Welcome to your PrepWise mock interview. I'm your AI interviewer. Whenever you're ready, we can begin!";
 
       await vapi.start({
         model: {
@@ -143,6 +153,7 @@ export default function Interview() {
           voiceId: "sarah",
         },
         name: "PrepWise Interviewer",
+        firstMessage,
       });
     } catch (err) {
       console.error(err);
@@ -178,13 +189,15 @@ export default function Interview() {
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-full bg-slate-700" />
             <span className="text-lg font-semibold">{interview.title}</span>
-            <div className="flex gap-1">
-              <span className="h-5 w-5 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs">◆</span>
-              <span className="h-5 w-5 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center text-xs">◇</span>
-            </div>
+            {interview.type === "Resume" && (
+              <span className="flex items-center gap-1 rounded-full bg-indigo-500/20 border border-indigo-500/40 px-2 py-0.5 text-xs text-indigo-300 font-medium">
+                <FileText size={11} />
+                Resume-Based
+              </span>
+            )}
           </div>
           <span className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-300">
-            {interview.type} Interview
+            {interview.type === "Resume" ? "Resume-Based" : interview.type} Interview
           </span>
         </div>
 

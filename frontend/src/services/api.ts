@@ -11,7 +11,18 @@ export const loginAPI = async (email: string, password: string) => {
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.message || "Login failed");
-  return data;
+  return data; // { accessToken, refreshToken, user }
+};
+
+export const refreshTokenAPI = async (refreshToken: string) => {
+  const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refreshToken }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || "Token refresh failed");
+  return data; // { accessToken, refreshToken }
 };
 
 export const signupAPI = async (formData: FormData) => {
@@ -121,15 +132,31 @@ export const getSystemPromptAPI = async (
   return data;
 };
 
+export const getResumeSystemPromptAPI = async (
+  duration: string,
+  token: string,
+  resumeContext?: string
+) => {
+  const response = await fetch(`${API_BASE_URL}/interviews/resume-prompt`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ duration, resumeContext: resumeContext || "" }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || "Failed to get resume prompt");
+  return data;
+};
+
 // ─── Payment ───────────────────────────────────────────────────────────────
 
-export const createPaymentOrderAPI = async (token: string) => {
+export const createPaymentOrderAPI = async (token: string, durationMinutes: number = 10) => {
   const response = await fetch(`${API_BASE_URL}/payment/create-order`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
+    body: JSON.stringify({ durationMinutes }),
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.message || "Failed to create order");

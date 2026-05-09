@@ -2,7 +2,8 @@ import { createOrderService, verifyPaymentService } from "../../services/payment
 
 export const createOrder = async (req, res) => {
   try {
-    const result = await createOrderService();
+    const { durationMinutes } = req.body;
+    const result = await createOrderService({ durationMinutes });
     res.status(200).json(result);
   } catch (error) {
     res.status(500).json({ message: error.message || "Failed to create payment order" });

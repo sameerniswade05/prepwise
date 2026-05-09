@@ -12,12 +12,16 @@ const getRazorpayInstance = () => {
   return new Razorpay({ key_id: keyId, key_secret: keySecret });
 };
 
-// Create a Razorpay order for ₹10 (1000 paise)
-export const createOrderService = async () => {
+// Create a Razorpay order — ₹10 per 10 minutes (10/20/30 min → ₹10/20/30)
+export const createOrderService = async ({ durationMinutes = 10 } = {}) => {
   const razorpay = getRazorpayInstance();
 
+  const validDurations = [10, 20, 30];
+  const duration = validDurations.includes(Number(durationMinutes)) ? Number(durationMinutes) : 10;
+  const amountPaise = duration * 100; // ₹1 per minute × 100 paise = duration * 100 paise
+
   const order = await razorpay.orders.create({
-    amount: 1000, // ₹10 in paise
+    amount: amountPaise,
     currency: "INR",
     receipt: `receipt_${Date.now()}`,
   });

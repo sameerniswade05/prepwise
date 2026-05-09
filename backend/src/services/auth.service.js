@@ -130,17 +130,27 @@ export const loginService = async ({ email, password }) => {
     throw new Error("Invalid credentials");
   }
 
-  // compare password
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
     throw new Error("Invalid credentials");
   }
 
-  // generate token
-  const token = jwt.sign({ id: user._id.toString(), email: user.email }, process.env.JWT_SECRET, { expiresIn: "7d" });
+  const refreshSecret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + "_refresh";
+
+  const accessToken = jwt.sign(
+    { id: user._id.toString(), email: user.email },
+    process.env.JWT_SECRET,
+    { expiresIn: "5h" }
+  );
+  const refreshToken = jwt.sign(
+    { id: user._id.toString(), email: user.email },
+    refreshSecret,
+    { expiresIn: "7d" }
+  );
 
   return {
-    token,
+    accessToken,
+    refreshToken,
     user: {
       id: user._id.toString(),
       email: user.email,
@@ -149,4 +159,32 @@ export const loginService = async ({ email, password }) => {
       resumePath: user.resumePath,
     },
   };
+};
+
+/* ------------------ REFRESH TOKEN ------------------ */
+export const refreshTokenService = async ({ refreshToken }) => {
+  const refreshSecret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + "_refresh";
+
+  let decoded;
+  try {
+    decoded = jwt.verify(refreshToken, refreshSecret);
+  } catch {
+    throw new Error("Invalid or expired refresh token");
+  }
+
+  const user = await User.findById(decoded.id).select("_id email fullName profilePicturePath resumePath");
+  if (!user) throw new Error("User not found");
+
+  const newAccessToken = jwt.sign(
+    { id: user._id.toString(), email: user.email },
+    process.env.JWT_SECRET,
+    { expiresIn: "5h" }
+  );
+  const newRefreshToken = jwt.sign(
+    { id: user._id.toString(), email: user.email },
+    refreshSecret,
+    { expiresIn: "7d" }
+  );
+
+  return { accessToken: newAccessToken, refreshToken: newRefreshToken };
 };

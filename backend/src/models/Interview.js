@@ -26,7 +26,7 @@ const interviewSchema = new mongoose.Schema(
       required: true,
     },
     title: { type: String, required: true },
-    type: { type: String, enum: ["Technical", "Non-Technical"], required: true },
+    type: { type: String, enum: ["Technical", "Non-Technical", "Resume"], required: true },
     role: { type: String, required: true },
     techStack: { type: String, default: "" },
     duration: { type: String, default: "10 minutes" },

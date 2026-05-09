@@ -1,12 +1,13 @@
 import express from "express";
 
-import { signup, login, getProfile, updateProfile } from "../controller/auth/auth.controller.js";
+import { signup, login, getProfile, updateProfile, refreshToken } from "../controller/auth/auth.controller.js";
 import authMiddleware from "../middleware/auth.middleware.js";
 import upload from "../middleware/upload.middleware.js";
 
 const router = express.Router();
 
 // Public routes
+router.post("/refresh-token", refreshToken);
 router.post(
   "/signup",
   upload.fields([

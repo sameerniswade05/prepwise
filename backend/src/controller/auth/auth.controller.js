@@ -1,6 +1,6 @@
 // src/controllers/auth.controller.js
 
-import { signupService, loginService, getProfileService, updateProfileService } from "../../services/auth.service.js";
+import { signupService, loginService, getProfileService, updateProfileService, refreshTokenService } from "../../services/auth.service.js";
 
 /* ------------------ SIGNUP ------------------ */
 export const signup = async (req, res) => {
@@ -37,13 +37,27 @@ export const login = async (req, res) => {
 
     res.status(200).json({
       message: "Login successful",
-      token: result.token,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
       user: result.user,
     });
   } catch (error) {
     res.status(400).json({
       message: error.message || "Login failed",
     });
+  }
+};
+
+/* ------------------ REFRESH TOKEN ------------------ */
+export const refreshToken = async (req, res) => {
+  try {
+    const { refreshToken: token } = req.body;
+    if (!token) return res.status(400).json({ message: "Refresh token required" });
+
+    const result = await refreshTokenService({ refreshToken: token });
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(401).json({ message: error.message || "Invalid or expired refresh token" });
   }
 };
 

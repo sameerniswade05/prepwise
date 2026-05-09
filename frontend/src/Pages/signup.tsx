@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { signupAPI } from "@/services/api";
 
 function Signup() {
@@ -64,10 +64,11 @@ function Signup() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-linear-to-br from-slate-950 via-slate-900 to-slate-800 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">Practice job interviews with AI</h1>
+          <p className="text-slate-400 text-sm">Create your free account to get started</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -161,11 +162,22 @@ function Signup() {
           <Button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold h-12 rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-linear-to-r from-indigo-500 to-purple-500 text-white font-semibold h-12 rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? "Creating account..." : "Create an account"}
           </Button>
         </form>
+
+        {/* Sign in link */}
+        <p className="mt-6 text-center text-slate-400 text-sm">
+          Already have an account?{" "}
+          <Link
+            to="/signin"
+            className="text-violet-400 hover:text-violet-300 font-medium transition-colors"
+          >
+            Sign in here
+          </Link>
+        </p>
       </div>
     </div>
   );
