@@ -40,7 +40,7 @@ function App() {
       />
 
       {/* Fallback */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/signin" replace />} />
     </Routes>
   );
 }
